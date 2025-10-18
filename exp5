@@ -1,0 +1,85 @@
+#define BLYNK_TEMPLATE_ID "TMPL3mAGbXNDp"
+#define BLYNK_TEMPLATE_NAME "Node MCU ESP8266"
+#define BLYNK_AUTH_TOKEN "ucP54eg307HrEpVsu0dkPcQFYBkLeiD_"
+
+#define BLYNK_PRINT Serial
+
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+
+// WiFi credentials
+char auth[] = BLYNK_AUTH_TOKEN;  
+char ssid[] = "Yash";           // 🔹 Replace with your WiFi name
+char pass[] = "12345678";      // 🔹 Replace with your WiFi password
+
+// DHT Sensor setup
+#define DHTPIN D4               // GPIO2
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// LED pin setup
+#define LED1 D1
+#define LED2 D2
+
+// Virtual pins
+const int temperaturePin = V2;
+const int humidityPin = V1;
+
+// Timer for sending data periodically
+BlynkTimer timer;
+
+// Send DHT data to Blynk
+void sendSensorData() {
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("⚠️ Failed to read from DHT sensor!");
+    return;
+  }
+
+  Blynk.virtualWrite(temperaturePin, temperature);
+  Blynk.virtualWrite(humidityPin, humidity);
+
+  Serial.print("🌡️ Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" °C  |  💧 Humidity: ");
+  Serial.print(humidity);
+  Serial.println(" %");
+}
+
+// Blynk controls for LEDs
+BLYNK_WRITE(V3) {
+  int led1State = param.asInt();
+  digitalWrite(LED1, led1State);
+  Serial.print("💡 LED1 (V3): ");
+  Serial.println(led1State ? "ON" : "OFF");
+}
+
+BLYNK_WRITE(V4) {
+  int led2State = param.asInt();
+  digitalWrite(LED2, led2State);
+  Serial.print("💡 LED2 (V4): ");
+  Serial.println(led2State ? "ON" : "OFF");
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  dht.begin();
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+
+  Serial.println("🔌 Connecting to WiFi...");
+  Blynk.begin(auth, ssid, pass);
+
+  timer.setInterval(2000L, sendSensorData); // Send every 2 seconds
+  Serial.println("✅ Setup Complete: DHT11 + LED Control Ready");
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
