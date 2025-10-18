@@ -1,0 +1,140 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <DHT.h>
+
+// ===== WiFi Credentials =====
+const char* ssid = "Yash";
+const char* password = "12345678";
+
+// ===== Twilio Credentials =====
+const char* account_sid = "ACe08339167f36be5b7fa015037b941887";
+const char* auth_token  = "ae65214c5b6714fcb3a664da42fe34e8";
+
+// ===== Twilio Numbers =====
+const char* twilio_number = "+15856340727";   // Your Twilio SMS number
+const char* recipient_number = "+919511644727"; // Your phone number
+const char* whatsapp_from = "whatsapp:+14155238886"; // Twilio Sandbox number
+const char* whatsapp_to   = "whatsapp:+919511644727"; // Your WhatsApp number
+
+// ===== DHT Setup =====
+#define DHTPIN D4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// ===== Timing =====
+unsigned long lastTime = 0;
+unsigned long timerDelay = 20000; // 20 seconds
+
+// ===== Base64 Encode for Authentication =====
+String base64Encode(String data) {
+  const char base64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  String encoded = "";
+  int val = 0, valb = -6;
+  for (unsigned char c : data) {
+    val = (val << 8) + c;
+    valb += 8;
+    while (valb >= 0) {
+      encoded += base64_table[(val >> valb) & 0x3F];
+      valb -= 6;
+    }
+  }
+  while (valb > -6) {
+    encoded += base64_table[((val << 8) >> (valb + 8)) & 0x3F];
+    valb -= 6;
+  }
+  while (encoded.length() % 4) encoded += '=';
+  return encoded;
+}
+
+// ===== Setup =====
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+  dht.begin();
+
+  Serial.println("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi connected!");
+}
+
+// ===== Main Loop =====
+void loop() {
+  if ((millis() - lastTime) > timerDelay) {
+    lastTime = millis();
+
+    float humidity = dht.readHumidity();
+    float temperature = dht.readTemperature();
+
+    if (isnan(humidity) || isnan(temperature)) {
+      Serial.println("⚠️ Failed to read from DHT sensor!");
+      return;
+    }
+
+    Serial.println("🌡️ Temp: " + String(temperature) + "°C | 💧 Humidity: " + String(humidity) + "%");
+
+    sendSMS(temperature, humidity);
+    delay(2000); // small delay to avoid conflicts
+    sendWhatsApp(temperature, humidity);
+  }
+}
+
+// ===== SEND SMS =====
+void sendSMS(float temperature, float humidity) {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    HTTPClient http;
+    client.setInsecure();
+
+    String url = "https://api.twilio.com/2010-04-01/Accounts/" + String(account_sid) + "/Messages.json";
+    String auth = base64Encode(String(account_sid) + ":" + String(auth_token));
+
+    String payload = "From=" + String(twilio_number) +
+                     "&To=" + String(recipient_number) +
+                     "&Body=🌡️ Temp: " + String(temperature) + "°C | 💧 Humidity: " + String(humidity) + "%";
+
+    http.begin(client, url);
+    http.addHeader("Authorization", "Basic " + auth);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    int httpCode = http.POST(payload);
+    if (httpCode > 0) {
+      Serial.println("✅ SMS Sent! HTTP code: " + String(httpCode));
+    } else {
+      Serial.println("❌ SMS Error: " + String(httpCode));
+    }
+    http.end();
+  }
+}
+
+// ===== SEND WhatsApp =====
+void sendWhatsApp(float temperature, float humidity) {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure client;
+    HTTPClient http;
+    client.setInsecure();
+
+    String url = "https://api.twilio.com/2010-04-01/Accounts/" + String(account_sid) + "/Messages.json";
+    String auth = base64Encode(String(account_sid) + ":" + String(auth_token));
+
+    String payload = "From=" + String(whatsapp_from) +
+                     "&To=" + String(whatsapp_to) +
+                     "&Body=🌡️ Temperature: " + String(temperature) + "°C, 💧 Humidity: " + String(humidity) + "%";
+
+    http.begin(client, url);
+    http.addHeader("Authorization", "Basic " + auth);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    int httpCode = http.POST(payload);
+    if (httpCode > 0) {
+      Serial.println("✅ WhatsApp Sent! HTTP code: " + String(httpCode));
+    } else {
+      Serial.println("❌ WhatsApp Error: " + String(httpCode));
+    }
+    http.end();
+  }
+}
