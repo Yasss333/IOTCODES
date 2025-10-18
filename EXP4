@@ -1,0 +1,67 @@
+/*************************************************************
+ * Blynk IoT - NodeMCU + DHT11 Sensor
+ * Sends Temperature and Humidity to Blynk Web Dashboard
+ *************************************************************/
+
+#define BLYNK_TEMPLATE_ID "TMPL3mAGbXNDp"
+#define BLYNK_TEMPLATE_NAME "Node MCU ESP8266"
+#define BLYNK_AUTH_TOKEN "dcGF0EnlfH9xy9khYqp8Ig329ZKTJf1V"
+
+#define BLYNK_PRINT Serial
+
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+
+// Wi-Fi credentials
+char ssid[] = "Yash";         // your Wi-Fi SSID
+char pass[] = "12345678";    // your Wi-Fi password
+
+// DHT setup
+#define DHTPIN D4
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// Virtual pins
+#define VPIN_TEMP V2
+#define VPIN_HUM  V1
+
+unsigned long lastMillis = 0;
+const unsigned long intervalMs = 2000; // 2 seconds
+
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  dht.begin();
+
+  Serial.println("Connecting to Blynk Cloud...");
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  Serial.println("Connected to Wi-Fi and Blynk!");
+}
+
+void loop() {
+  Blynk.run();
+
+  if (millis() - lastMillis >= intervalMs) {
+    lastMillis = millis();
+
+    float temp = dht.readTemperature();
+    float hum = dht.readHumidity();
+
+    if (isnan(temp) || isnan(hum)) {
+      Serial.println("⚠️ DHT Sensor Reading Failed!");
+      return;
+    }
+
+    Serial.print("🌡 Temp: ");
+    Serial.print(temp);
+    Serial.print("°C  | 💧 Humidity: ");
+    Serial.print(hum);
+    Serial.println("%");
+
+    // Send to Blynk Web Dashboard
+    Blynk.virtualWrite(VPIN_TEMP, temp);
+    Blynk.virtualWrite(VPIN_HUM, hum);
+  }
+}
