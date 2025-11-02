@@ -4,8 +4,8 @@
 #include <Adafruit_Sensor.h>
 
 // ===== Wi-Fi Credentials =====
-const char* ssid = "Yash";         // Change this to your Wi-Fi name
-const char* password = "12345678"; // Change this to your Wi-Fi password
+const char* ssid = "Yash";         // 🔹 Your Wi-Fi name
+const char* password = "12345678"; // 🔹 Your Wi-Fi password
 
 // ===== DHT Sensor Settings =====
 #define DHTPIN D4         // Pin connected to DHT11 data pin
@@ -24,24 +24,31 @@ void setup() {
   Serial.println("\nInitializing DHT sensor...");
   dht.begin();
 
-  // Connect to Wi-Fi
+  // ===== Connect to Wi-Fi =====
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
+  int retries = 0;
+  while (WiFi.status() != WL_CONNECTED && retries < 30) {
     delay(500);
     Serial.print(".");
+    retries++;
   }
 
-  Serial.println("\nWi-Fi connected!");
-  Serial.print("NodeMCU IP Address: ");
-  Serial.println(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ Wi-Fi connected!");
+    Serial.print("NodeMCU IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n❌ Failed to connect to Wi-Fi!");
+    Serial.println("Please check SSID or password and reset the board.");
+  }
 
-  // Setup Web Server route
+  // ===== Setup Web Server route =====
   server.on("/", handleRoot);
   server.begin();
-  Serial.println("HTTP server started!");
+  Serial.println("🌐 HTTP server started!");
 }
 
 void loop() {
@@ -63,12 +70,14 @@ void handleRoot() {
     return;
   }
 
-  // Create a simple HTML dashboard
-  String html = "<html><head><meta http-equiv='refresh' content='5'></head><body>";
+  // ===== Create a simple HTML dashboard =====
+  String html = "<html><head><meta http-equiv='refresh' content='5'>";
+  html += "<style>body{font-family:Arial;background:#f3f4f6;text-align:center;margin-top:50px;}";
+  html += "h1{color:#333;}p{font-size:20px;color:#555;}</style></head><body>";
   html += "<h1>🌡 ESP8266 Sensor Dashboard</h1>";
   html += "<p><b>Temperature:</b> " + String(temperature) + " &deg;C</p>";
   html += "<p><b>Humidity:</b> " + String(humidity) + " %</p>";
-  html += "<p>Page refreshes every 5 seconds.</p>";
+  html += "<p><i>Page refreshes every 5 seconds.</i></p>";
   html += "</body></html>";
 
   server.send(200, "text/html", html);
@@ -79,15 +88,15 @@ void printToSerial() {
   float humidity = dht.readHumidity();
 
   if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("Sensor error! Unable to read data.");
+    Serial.println("⚠️ Sensor error! Unable to read data.");
     return;
   }
 
   Serial.println("===== DHT11 Sensor Data =====");
-  Serial.print("Temperature: ");
+  Serial.print("🌡 Temperature: ");
   Serial.print(temperature);
   Serial.println(" °C");
-  Serial.print("Humidity: ");
+  Serial.print("💧 Humidity: ");
   Serial.print(humidity);
   Serial.println(" %");
   Serial.println("=============================");
